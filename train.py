@@ -21,13 +21,13 @@ def get_data():
     # dev_examples = format_data(dataset['dev'], 'dev')
     # test_examples = format_data(dataset['test'], 'test')
     
-    dev_sentences1 = [example['sentence1'] for example in dataset['validation']]
-    dev_sentences2 = [example['sentence2'] for example in dataset['validation']]
-    dev_scores = [example['score'] / 5.0 for example in dataset['validation']]
+    dev_sentences1 = [example['sentence1'] for example in dataset['dev']]
+    dev_sentences2 = [example['sentence2'] for example in dataset['dev']]
+    dev_scores = [example['similarity_score'] / 5.0 for example in dataset['dev']]
 
     test_sentences1 = [example['sentence1'] for example in dataset['test']]
     test_sentences2 = [example['sentence2'] for example in dataset['test']]
-    test_scores = [example['score'] / 5.0 for example in dataset['test']]
+    test_scores = [example['similarity_score'] / 5.0 for example in dataset['test']]
     
     train_dataloader = DataLoader(train_examples, shuffle=True, batch_size=64)
     # dev_dataloader = DataLoader(dev_examples, shuffle=False, batch_size=64)
@@ -43,7 +43,7 @@ model = SentenceTransformer(model_id)
 train_loss = losses.CosineSimilarityLoss(model=model)
 
 # train_dataloader, dev_dataloader, test_dataloader = get_data()
-train_dataloader, dev_examples, test_examples = get_data()
+train_dataloader, (dev_sentences1, dev_sentences2, dev_scores), (test_sentences1, test_sentences2, test_scores) = get_data()
 model.fit(train_objectives=[(train_dataloader, train_loss)], epochs=1)
 
 # Save the model
@@ -57,11 +57,9 @@ evaluator = EmbeddingSimilarityEvaluator(test_sentences1, test_sentences2, test_
 model.evaluate(evaluator)
 
 # Compute embeddings manually and print similarity scores
-test_sentences1 = [example.texts[0] for example in test_examples]
-test_sentences2 = [example.texts[1] for example in test_examples]
 embeddings1 = model.encode(test_sentences1, convert_to_tensor=True)
 embeddings2 = model.encode(test_sentences2, convert_to_tensor=True)
 
 cos = nn.CosineSimilarity(dim=1)
 similarity_scores = cos(embeddings1, embeddings2)
-print(similarity_scores)
+print("Cosine Similarity Scores:", similarity_scores)
