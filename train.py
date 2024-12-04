@@ -18,14 +18,22 @@ def get_data():
     dataset = load_dataset(dataset_id, name="fr") #, split="test")
 
     train_examples = format_data(dataset['train'], 'train')
-    dev_examples = format_data(dataset['dev'], 'dev')
-    test_examples = format_data(dataset['test'], 'test')
+    # dev_examples = format_data(dataset['dev'], 'dev')
+    # test_examples = format_data(dataset['test'], 'test')
+    
+    dev_sentences1 = [example['sentence1'] for example in dataset['validation']]
+    dev_sentences2 = [example['sentence2'] for example in dataset['validation']]
+    dev_scores = [example['score'] / 5.0 for example in dataset['validation']]
+
+    test_sentences1 = [example['sentence1'] for example in dataset['test']]
+    test_sentences2 = [example['sentence2'] for example in dataset['test']]
+    test_scores = [example['score'] / 5.0 for example in dataset['test']]
     
     train_dataloader = DataLoader(train_examples, shuffle=True, batch_size=64)
     # dev_dataloader = DataLoader(dev_examples, shuffle=False, batch_size=64)
     # test_dataloader = DataLoader(test_examples, shuffle=False, batch_size=64)
     # return train_dataloader, dev_dataloader, test_dataloader
-    return train_dataloader, dev_examples, test_examples
+    return train_dataloader, (dev_sentences1, dev_sentences2, dev_scores), (test_sentences1, test_sentences2, test_scores)
 
 
 # model_id = "sentence-transformers/all-MiniLM-L6-v2"
@@ -42,10 +50,10 @@ model.fit(train_objectives=[(train_dataloader, train_loss)], epochs=1)
 model.save("models/camembert-stsb")
 
 # Evaluate the model
-evaluator = EmbeddingSimilarityEvaluator(dev_examples)
+evaluator = EmbeddingSimilarityEvaluator(dev_sentences1, dev_sentences2, dev_scores)
 model.evaluate(evaluator)
 # print performance on test set
-evaluator = EmbeddingSimilarityEvaluator(test_examples)
+evaluator = EmbeddingSimilarityEvaluator(test_sentences1, test_sentences2, test_scores)
 model.evaluate(evaluator)
 
 # Compute embeddings manually and print similarity scores
