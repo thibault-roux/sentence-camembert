@@ -3,36 +3,56 @@ from datasets import load_dataset
 from sentence_transformers import InputExample
 from torch.utils.data import DataLoader
 from sentence_transformers import losses
-
+from sentence_transformers.evaluation import EmbeddingSimilarityEvaluator
 
 
 
 def get_data():
-    dataset_id = "embedding-data/QQP_triplets"
-    dataset = load_dataset(dataset_id)
-    # df_test = load_dataset("stsb_multi_mt", name="fr", split="test")
-
-    print(f"- The {dataset_id} dataset has {dataset['train'].num_rows} examples.")
-    print(f"- Each example is a {type(dataset['train'][0])} with a {type(dataset['train'][0]['set'])} as value.")
-    print(f"- Examples look like this: {dataset['train'][0]}")
+    dataset_id = "stsb_multi_mt"
+    dataset = load_dataset(dataset_id, name="fr") #, split="test")
 
     train_examples = []
-    train_data = dataset['train']['set']
-    # For agility we only 1/2 of our available data                                
-    n_examples = dataset['train'].num_rows // 2
-
-    for i in range(n_examples):
+    train_data = dataset['train']
+    for i in range(len(dataset['train'])):
         example = train_data[i]
-        train_examples.append(InputExample(texts=[example['query'], example['pos'][0], example['neg'][0]]))
+        train_examples.append(InputExample(texts=[example['sentence1'], example['sentence2']], label=example['similarity_score']))
+    # do the same thing automatically for train, dev, test
+    dev_examples = []
+    dev_data = dataset['dev']
+    for i in range(len(dataset['dev'])):
+        example = dev_data[i]
+        dev_examples.append(InputExample(texts=[example['sentence1'], example['sentence2']], label=example['similarity_score']))
+    test_examples = []
+    test_data = dataset['test']
+    for i in range(len(dataset['test'])):
+        example = test_data[i]
+        test_examples.append(InputExample(texts=[example['sentence1'], example['sentence2']], label=example['similarity_score']))
 
-    train_dataloader = DataLoader(train_examples, shuffle=True, batch_size=16)
-    return train_dataloader
+    train_dataloader = DataLoader(train_examples, shuffle=True, batch_size=64)
+    dev_dataloader = DataLoader(dev_examples, shuffle=False, batch_size=64)
+    test_dataloader = DataLoader(test_examples, shuffle=False, batch_size=64)
+    return train_dataloader, dev_dataloader, test_dataloader
 
 
-model_id = "sentence-transformers/all-MiniLM-L6-v2"
+# model_id = "sentence-transformers/all-MiniLM-L6-v2"
+model_id = 'almanach/camembertv2-base'
 model = SentenceTransformer(model_id)
 
-train_loss = losses.TripletLoss(model=model)
+train_loss = losses.CosineSimilarityLoss(model=model)
 
-train_dataloader = get_data()
-model.fit(train_objectives=[(train_dataloader, train_loss)], epochs=10)
+train_dataloader, dev_dataloader, test_dataloader = get_data()
+model.fit(train_objectives=[(train_dataloader, train_loss)], epochs=1)
+
+# Save the model
+model.save("models/camembert-stsb")
+
+# Evaluate the model
+evaluator = EmbeddingSimilarityEvaluator(dev_dataloader)
+model.evaluate(evaluator)
+# print performance on test set
+evaluator = EmbeddingSimilarityEvaluator(test_dataloader)
+model.evaluate(evaluator)
+# print results
+results = model.predict(test_dataloader)
+print(results)
+
